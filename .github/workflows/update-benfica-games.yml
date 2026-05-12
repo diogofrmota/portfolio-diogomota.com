@@ -1,9 +1,10 @@
 name: Update Benfica Games
 
 on:
-  schedule:
-    # Runs every 24 hours (at 00:00 UTC)
-    - cron: '0 0 * * *'
+  # Temporarily disabled automatic schedule
+  # schedule:
+  #   # Runs every 24 hours (at 00:00 UTC)
+  #   - cron: '0 0 * * *'
   workflow_dispatch: # Allows manual triggering
     inputs:
       reason:
