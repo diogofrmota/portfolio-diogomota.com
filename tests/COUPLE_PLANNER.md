@@ -5,8 +5,8 @@ Verified on 14 September 2026 against the local development server and the optim
 ## Repeatable checks
 
 - `npm run build`
-- `npm run test:couple-planner` — nine data-validation and collaboration regression tests; no database needed.
-- `npm run test:couple-planner:db` — opt-in integration checks against the configured database. Creates uniquely identified test accounts and deletes only those accounts in a `finally` block. Requires the existing database schema and `.env.local` configuration.
+- `npm run test:couple-planner` â€” nine data-validation and collaboration regression tests; no database needed.
+- `npm run test:couple-planner:db` â€” opt-in integration checks against the configured database. Creates uniquely identified test accounts and deletes only those accounts in a `finally` block. Requires the existing database schema and `.env.local` configuration.
 
 ## Verified flows
 
