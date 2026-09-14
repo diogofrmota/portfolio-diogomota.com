@@ -1,0 +1,405 @@
+.shell {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  overflow: clip;
+  background: #111312;
+  color: #f3f4ef;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.shell a {
+  text-decoration: none;
+}
+
+.shell a:hover,
+.shell button:hover {
+  opacity: 1;
+}
+
+.shell a:focus-visible,
+.shell button:focus-visible {
+  outline: 3px solid #d6edac;
+  outline-offset: 5px;
+}
+
+.header {
+  min-height: 84px;
+  padding: 20px 5%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+
+.brand {
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: -1px;
+}
+
+.brand span,
+.productNote,
+.accountName {
+  color: #9da49d;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 3px 3px 12px;
+  border: 1px solid #343a35;
+  border-radius: 999px;
+  background: #191c1a;
+}
+
+.accountName {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.signOut {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: #292e2a;
+  color: #e3e8df;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.signOut:hover {
+  background: #343b35;
+}
+
+.signOut:active {
+  background: #222622;
+}
+
+.main {
+  flex: 1;
+  width: min(900px, 100%);
+  min-height: 0;
+  margin: auto;
+  padding: 28px 28px 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+
+.eyebrow {
+  color: #b3bcb1;
+  font-size: 11px;
+  line-height: 1.5;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.main h1 {
+  margin: 12px 0 8px;
+  font-size: clamp(32px, 5vw, 52px);
+  line-height: 1.08;
+  font-weight: 500;
+  letter-spacing: -2px;
+}
+
+.intro {
+  color: #aeb6aa;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.appGrid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(12px, 3vw, 30px);
+  margin: clamp(24px, 5vh, 42px) auto 22px;
+}
+
+.appLink {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 18px;
+}
+
+.appTile {
+  width: 100%;
+  aspect-ratio: 1.35;
+  border: 3px solid transparent;
+  border-radius: 20px;
+  padding: 18px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 160ms ease, border-color 160ms ease,
+    filter 160ms ease;
+}
+
+.violet {
+  background: #b9afe5;
+  color: #302747;
+}
+
+.peach {
+  background: #eac0a2;
+  color: #573727;
+}
+
+.green {
+  background: #b9d99b;
+  color: #2c4420;
+}
+
+.appTile svg {
+  width: clamp(38px, 6vw, 64px);
+  height: clamp(38px, 6vw, 64px);
+}
+
+.tileCategory {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tileArrow {
+  position: absolute;
+  right: 15px;
+  bottom: 11px;
+  font-size: 21px;
+}
+
+.appLink:hover .appTile,
+.appLink:focus-visible .appTile {
+  border-color: #fff;
+  transform: translateY(-2px);
+}
+
+.appLink:active .appTile {
+  filter: brightness(0.9);
+  transform: translateY(0);
+}
+
+.appName {
+  margin: 13px 0 4px;
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.appDescription {
+  color: #aab2a6;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.suggested {
+  margin-top: 6px;
+  color: #d3e8b1;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.access {
+  width: min(520px, 100%);
+  margin: 0 auto;
+  color: #aeb6aa;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.accessActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.primaryAction,
+.secondaryAction {
+  min-height: 44px;
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #dbe8c4;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.primaryAction {
+  background: #e5f0d2;
+  color: #1c2519;
+}
+
+.secondaryAction {
+  color: #e3e8df;
+  border-color: #465044;
+  background: #1c201d;
+}
+
+.primaryAction:hover {
+  background: #d5e8b4;
+}
+
+.secondaryAction:hover {
+  border-color: #889483;
+  background: #252a26;
+}
+
+.selectionNote {
+  color: #9da697;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.footer {
+  padding: 18px 5%;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  color: #9ca49a;
+  font-size: 12px;
+}
+
+@media (max-width: 560px) {
+  .header {
+    min-height: 64px;
+    padding: 12px 16px;
+  }
+
+  .brand {
+    font-size: 21px;
+  }
+
+  .brand span,
+  .productNote {
+    font-size: 11px;
+  }
+
+  .main {
+    padding: 16px 12px 18px;
+  }
+
+  .main h1 {
+    margin-top: 8px;
+    font-size: 30px;
+    letter-spacing: -1.5px;
+  }
+
+  .intro {
+    max-width: 310px;
+    margin-inline: auto;
+    font-size: 12px;
+  }
+
+  .appGrid {
+    gap: 8px;
+    margin: 20px auto 16px;
+  }
+
+  .appTile {
+    aspect-ratio: 1.08;
+    padding: 8px;
+    border-radius: 13px;
+    border-width: 2px;
+  }
+
+  .appTile svg {
+    width: 36px;
+    height: 36px;
+  }
+
+  .tileCategory {
+    top: 7px;
+    left: 8px;
+    font-size: 8px;
+  }
+
+  .tileArrow {
+    right: 7px;
+    bottom: 5px;
+    font-size: 15px;
+  }
+
+  .appName {
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 1.25;
+  }
+
+  .appDescription {
+    font-size: 10px;
+    line-height: 1.35;
+  }
+
+  .suggested {
+    font-size: 9px;
+  }
+
+  .access {
+    font-size: 11px;
+  }
+
+  .accessActions {
+    margin-top: 9px;
+  }
+
+  .primaryAction,
+  .secondaryAction {
+    min-height: 42px;
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .footer {
+    padding: 12px 16px;
+    font-size: 10px;
+  }
+
+  .accountName {
+    display: none;
+  }
+
+  .account {
+    padding-left: 3px;
+  }
+}
+
+@media (max-height: 620px) {
+  .header {
+    min-height: 58px;
+  }
+
+  .main {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .main h1 {
+    font-size: 28px;
+  }
+
+  .appGrid {
+    margin-top: 14px;
+    margin-bottom: 12px;
+  }
+
+  .footer {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+}

@@ -1,4 +1,15 @@
-Personal website and apps built with Next.js.
+Personal website and a shared app product built with Next.js.
+
+The homepage at `/` is the minimal public portfolio. `/apps` is a separate,
+modern product hub containing three smaller apps:
+
+- **TVSync** for movie and TV tracking
+- **Couple Planner** for a shared two-person agenda
+- **Fithub** for fitness progress
+
+These are three experiences inside one app, not three separate account systems.
+A user signs in once with Google and uses the same shared account across all
+three mini-apps. `/apps` remains the central picker for moving between them.
 
 ```bash
 npm install
@@ -22,5 +33,6 @@ renders a small preview catalogue.
 
 All product data is namespaced within that database: TVSync stores libraries,
 ratings, and episode progress; Couple Planner stores a shared two-person space;
-and Fithub stores each user's fitness state. The apps use one Google account and
-the shared `app_users` table, while keeping each app's records isolated.
+and Fithub stores each user's fitness state. The three mini-apps use one Google
+login and the shared `app_users` identity, while keeping each mini-app's domain
+records isolated.

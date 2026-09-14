@@ -1,18 +1,14 @@
 import { auth } from '../../auth';
-import { redirect } from 'next/navigation';
+import { safeAppPath } from '../../lib/app-navigation';
 import AppsClient from './apps-client';
 
 export const metadata = { title: 'Apps' };
 
-export default async function Apps() {
+export default async function Apps({ searchParams }) {
+  const callbackUrl = safeAppPath((await searchParams).callbackUrl);
   const session = await auth();
-  if (session?.user) redirect('/select-app');
 
   return (
-    <main>
-      <div className="content">
-        <AppsClient />
-      </div>
-    </main>
+    <AppsClient user={session?.user ?? null} callbackUrl={callbackUrl} />
   );
 }
