@@ -10,7 +10,7 @@ export default async function ProtectedLayout({ children }) {
   return (
     <div className={styles.shell}>
       <header className={styles.header}>
-        <Link className={styles.brand} href="/apps" aria-label="Back to all apps">
+        <Link className={styles.brand} href="/select-app" aria-label="Back to all apps">
           dm<span>/apps</span>
         </Link>
         <div className={styles.account}>

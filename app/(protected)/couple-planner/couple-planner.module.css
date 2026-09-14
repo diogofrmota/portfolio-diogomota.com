@@ -1,5 +1,5 @@
 .app {
-  --red: #e63b2e;
+  --red: #c6382c;
   --red-dark: #bd2d25;
   --ink: #2a1714;
   --muted: #74635f;
@@ -9,6 +9,7 @@
   grid-template-columns: 232px minmax(0, 1fr);
   background: #fbf6f1;
   color: var(--ink);
+  color-scheme: light;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -147,7 +148,7 @@
   .app { grid-template-columns: 190px minmax(0, 1fr); }
   .sidebar { padding-inline: 12px; }
   .calendarLayout { grid-template-columns: 1fr; }
-  .upNext { display: none; }
+  .upNext { display: block; }
   .collectionGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
@@ -189,3 +190,76 @@
 }
 
 @media (prefers-reduced-motion: reduce) { .primaryButton { transition: none; } }
+
+/* Product controls and the day agenda stay usable at every screen size. */
+.app button:focus-visible, .app a:focus-visible { outline: 3px solid #9b3027; outline-offset: 3px; }
+.app button:active:not(:disabled) { transform: translateY(1px); }
+.dayNumber { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; color: inherit; font-size: .8rem; font-weight: 700; }
+.today .dayNumber { background: var(--red); color: white; }
+.dayNumber.selectedDay { outline: 2px solid var(--red-dark); outline-offset: 2px; }
+.dayNumber:hover { background: #ffebe6; color: var(--red-dark); }
+.moreEvents { margin-top: 5px; color: var(--red-dark); font-size: .65rem; text-decoration: underline !important; }
+.selectedPlans { display: grid; gap: 12px; margin-bottom: 28px; }
+.selectedPlans article { padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.selectedPlans h4 { margin: 0 0 5px; font-size: .9rem; }
+.selectedPlans p { color: var(--muted); font-size: .8rem; line-height: 1.6; white-space: pre-wrap; }
+.selectedPlans .itemActions { margin-top: 8px; }
+.secondaryButton { min-height: 44px; padding: 9px 12px !important; border: 1px solid var(--line) !important; border-radius: 10px; color: var(--red-dark); font-size: .8rem !important; font-weight: 700 !important; }
+.secondaryButton:hover { background: #fff0ec; }
+.agendaLink { min-height: 32px; color: var(--ink); font-size: .82rem !important; font-weight: 700 !important; text-align: left; }
+.agendaLink:hover { text-decoration: underline !important; }
+.welcome { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 28px; padding: 20px 22px; border: 1px solid #e7c7bb; border-radius: 14px; background: #f9ece3; }
+.welcome strong { font-size: .92rem; }
+.welcome p { margin-top: 5px; color: var(--muted); font-size: .8rem; line-height: 1.5; }
+.welcome button { flex-shrink: 0; min-height: 44px; color: var(--red-dark); font-size: .8rem; font-weight: 750; text-decoration: underline; }
+.errorBanner { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; padding: 16px; border: 1px solid #d38877; border-radius: 12px; background: #fff0e9; color: #84291f; font-size: .85rem; line-height: 1.5; }
+.errorBanner p { flex-basis: 100%; }
+.errorBanner button { min-height: 44px; text-decoration: underline; font-weight: 700; }
+.deleteButton { min-height: 44px; justify-self: start; color: var(--red-dark); text-decoration: underline !important; font-size: .8rem !important; }
+.dataFooter { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 30px; color: var(--muted); font-size: .72rem; }
+.dataFooter button { min-height: 44px; text-decoration: underline; }
+.collectionCard, .task, .selectedPlans, .agendaList { overflow-wrap: anywhere; }
+.collectionCard p, .task p { white-space: pre-wrap; }
+.collectionCard p { max-height: 220px; overflow-y: auto; width: 100%; }
+.collectionCard h2 { margin-top: 22px; }
+.task h3 { font-size: .9rem; }
+.task p, .collectionCard p, .collectionCard time, .emptyState p { font-size: .8rem; line-height: 1.6; }
+.task time { font-size: .72rem; }
+.emptyState h3 { font-size: 1rem; }
+.taskDone h3 { color: #74635f; }
+.itemActions button, .cardTop .itemActions button { width: 44px; height: 44px; color: #74635f; }
+.checkbox { width: 28px; height: 28px; }
+.dialog label { font-size: .82rem; }
+.dialog input, .dialog textarea { font-size: 1rem; }
+.dialog > p { font-size: .85rem; }
+.dialog { max-height: calc(100dvh - 32px); }
+.formActions button, .joinForm button, .invitePanel button { min-height: 44px; font-size: .8rem; }
+.invitePanel span, .invitePanel small, .joinForm .joinWarning { font-size: .75rem; }
+.sidebar nav button { font-size: .85rem; }
+.calendarControls button { min-height: 44px; min-width: 44px; }
+@media (max-width: 760px) {
+  .welcome { align-items: flex-start; flex-direction: column; gap: 8px; padding: 18px; }
+  .dayNumber { width: 36px; height: 36px; margin: 0 auto; font-size: .75rem; }
+  .calendarEvent { pointer-events: none; }
+  .moreEvents { display: none; }
+  .day { min-height: 76px; }
+  .calendarToolbar { gap: 8px; padding: 10px; flex-wrap: wrap; }
+  .calendarControls button:first-child { display: grid; }
+  .upNext { padding: 20px; }
+  .mobileNav { height: auto; min-height: 72px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  .mobileNav button { min-height: 50px; font-size: .6rem; }
+  .app { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+  .task { grid-template-columns: 28px minmax(0, 1fr); }
+  .task > .itemActions { grid-column: 2; justify-content: flex-end; }
+  .summary { font-size: .75rem; }
+  .undoToast { bottom: calc(88px + env(safe-area-inset-bottom)); }
+}
+.fallback { display: block; }
+.fallback .content { max-width: 720px; margin: 0 auto; }
+.fallback h1 { font-family: Georgia, serif; font-size: 2.5rem; }
+.fallback p { margin-bottom: 24px; line-height: 1.6; }
+@media (max-width: 760px) {
+  .calendarEvent { display: none; }
+  .day:has(.calendarEvent) .dayNumber { position: relative; }
+  .day:has(.calendarEvent) .dayNumber::after { content: ''; position: absolute; bottom: -10px; width: 6px; height: 6px; border-radius: 50%; background: var(--red); }
+}

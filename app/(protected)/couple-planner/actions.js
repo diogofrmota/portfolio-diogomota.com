@@ -2,14 +2,19 @@
 
 import { revalidatePath } from 'next/cache';
 import { auth } from '../../../auth';
-import { createCoupleWorkspaceInvite, joinCoupleWorkspace, saveCoupleWorkspaceData } from '../../../lib/couple-planner';
+import { createCoupleWorkspaceInvite, joinCoupleWorkspace, saveCoupleWorkspaceData, getCoupleWorkspaceSnapshot, normalizeCouplePlannerData } from '../../../lib/couple-planner';
 
 const expectedPlannerErrors = new Set([
+  'Your session has expired. Download any unsaved plans, then sign in again.',
   'Only the workspace owner can create an invite.',
   'This shared space already has two members.',
   'Enter a valid six-character invite code.',
   'That invite is invalid or expired.',
-  'Leave your current shared space before joining another one.',
+  'You are already connected to a partner. You cannot join another space.',
+  'You no longer have access to this shared space.',
+  'Your partner changed the same item. Download your changes, then load the latest plans and try again.',
+  'Your space is busy. Please retry your save.',
+  'This section is full. Remove an item before adding another.',
   'That invite was already used or the shared space is full.',
 ]);
 
@@ -21,19 +26,31 @@ function safePlannerError(error, fallback) {
 
 async function requireUser() {
   const session = await auth();
-  if (!session?.user?.id || !session.user.email) throw new Error('You must be signed in.');
+  if (!session?.user?.id || !session.user.email) throw new Error('Your session has expired. Download any unsaved plans, then sign in again.');
   return session.user;
 }
 
-export async function saveCouplePlannerData(workspaceId, data) {
-  const user = await requireUser();
-  if (!data || typeof data !== 'object' || Array.isArray(data)) return { ok: false, error: 'Invalid planner data.' };
+export async function saveCouplePlannerData(workspaceId, data, baseData) {
   try {
-    await saveCoupleWorkspaceData(user, workspaceId, data);
-    return { ok: true };
+    const user = await requireUser();
+    if (!data || !baseData || typeof data !== 'object' || typeof baseData !== 'object' ||
+        Array.isArray(data) || Array.isArray(baseData) || JSON.stringify([data, baseData]).length > 800000) {
+      return { ok: false, error: 'Invalid planner data or too many changes in one save.' };
+    }
+    const saved = await saveCoupleWorkspaceData(user, workspaceId, data, baseData);
+    return { ok: true, data: saved };
   } catch (error) {
-    console.error('Unable to save Couple Planner data:', error);
-    return { ok: false, error: 'Could not save your latest changes.' };
+    return { ok: false, error: safePlannerError(error, 'Could not save your latest changes. Check your connection and try again.') };
+  }
+}
+
+export async function refreshCouplePlannerData(workspaceId) {
+  try {
+    const user = await requireUser();
+    const snapshot = await getCoupleWorkspaceSnapshot(user, workspaceId);
+    return { ok: true, ...snapshot, data: normalizeCouplePlannerData(snapshot.data) };
+  } catch (error) {
+    return { ok: false, error: safePlannerError(error, 'Could not refresh your shared plans. Check your connection.') };
   }
 }
 

@@ -8,13 +8,17 @@ export const metadata = {
   description: 'One shared place for plans, tasks, dates, trips, recipes, and entertainment.',
 };
 
-export default async function CouplePlanner() {
+export default async function CouplePlanner({ searchParams }) {
+  const query = await searchParams;
+  const inviteCode = typeof query.invite === 'string' && /^[A-Z0-9]{6}$/i.test(query.invite) ? query.invite.toUpperCase() : '';
   const session = await auth();
   if (!session?.user) redirect('/login?callbackUrl=/couple-planner');
   const workspace = await getCouplePlannerWorkspace(session.user);
 
   return (
     <CouplePlannerDashboard
+      key={workspace.id}
+      inviteCode={inviteCode}
       userName={session?.user?.name || session?.user?.email?.split('@')[0] || 'You'}
       today={new Date().toISOString().slice(0, 10)}
       initialData={workspace.data}

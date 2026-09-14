@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPartnerInvite, joinPartnerSpace, saveCouplePlannerData } from './actions';
+import { createPartnerInvite, joinPartnerSpace, saveCouplePlannerData, refreshCouplePlannerData } from './actions';
+import { plannerChanges } from '../../../lib/couple-planner-model.mjs';
 import styles from './couple-planner.module.css';
 
 const sections = [
@@ -51,19 +52,38 @@ const emptyData = () => Object.fromEntries(sections.map(({ id }) => [id, []]));
 
 function formatDate(iso, options = {}) {
   if (!iso) return '';
-  return new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', ...options }).format(new Date(`${iso}T12:00:00Z`));
+  const date = new Date(`${iso}T12:00:00Z`);
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return [
+    options.weekday && (options.weekday === 'short' ? weekdays[date.getUTCDay()].slice(0, 3) : weekdays[date.getUTCDay()]),
+    options.day && (options.day === '2-digit' ? String(date.getUTCDate()).padStart(2, '0') : date.getUTCDate()),
+    options.month && (options.month === 'short' ? months[date.getUTCMonth()].slice(0, 3) : months[date.getUTCMonth()]),
+    options.year && date.getUTCFullYear(),
+  ].filter(Boolean).join(' ');
 }
 
-function useDialogAccessibility(dialogRef, initialFocusRef, onClose) {
+function useDialogAccessibility(dialogRef, initialFocusRef, onClose, busy = false) {
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
   useEffect(() => {
     const previousFocus = document.activeElement;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const focusable = dialogRef.current?.querySelectorAll('button:not([disabled]), input:not([disabled]), textarea:not([disabled])');
     (initialFocusRef.current || focusable?.[0])?.focus();
+    const background = [];
+    for (let node = dialogRef.current?.parentElement; node && node !== document.body; node = node.parentElement) {
+      for (const sibling of node.parentElement?.children || []) {
+        if (sibling !== node && sibling instanceof HTMLElement) {
+          background.push([sibling, sibling.inert]);
+          sibling.inert = true;
+        }
+      }
+    }
 
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !busyRef.current) {
         event.preventDefault();
         onClose();
         return;
@@ -86,12 +106,16 @@ function useDialogAccessibility(dialogRef, initialFocusRef, onClose) {
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = previousOverflow;
-      previousFocus?.focus?.();
+      for (const [element, inert] of background) element.inert = inert;
+      if (previousFocus?.isConnected) previousFocus.focus?.();
+      else document.querySelector('[data-add-plan]')?.focus();
     };
   }, [dialogRef, initialFocusRef, onClose]);
 }
 
-function Calendar({ items, cursor, setCursor, today, onEdit }) {
+function Calendar({ items, cursor, setCursor, today, onEdit, onAdd, onDelete }) {
+  const [selected, setSelected] = useState(today);
+  const selectedItems = items.filter(item => item.date === selected);
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
   const firstDay = new Date(year, month, 1);
@@ -137,17 +161,24 @@ function Calendar({ items, cursor, setCursor, today, onEdit }) {
             const dayItems = eventsByDate[iso] || [];
             return (
               <div className={`${styles.day} ${cell.muted ? styles.mutedDay : ''} ${iso === today ? styles.today : ''}`} role="group" aria-label={formatDate(iso, { weekday: 'long', day: 'numeric', month: 'long' })} key={`${iso}-${index}`}>
-                <time dateTime={iso} aria-current={iso === today ? 'date' : undefined}>{cell.day}</time>
+                <button type="button" className={`${styles.dayNumber} ${selected === iso ? styles.selectedDay : ''}`} onClick={() => setSelected(iso)} aria-label={`${formatDate(iso, { day: 'numeric', month: 'long' })}, ${dayItems.length} plans`} aria-pressed={selected === iso} aria-current={iso === today ? 'date' : undefined}>{cell.day}</button>
                 {dayItems.slice(0, 2).map((item) => (
                   <button className={styles.calendarEvent} style={{ '--event-color': item.color || '#e63b2e' }} type="button" onClick={() => onEdit(item)} title={`Edit ${item.title}`} key={item.id}>{item.title}</button>
                 ))}
-                {dayItems.length > 2 && <small>+{dayItems.length - 2} more</small>}
+                {dayItems.length > 2 && <button type="button" className={styles.moreEvents} onClick={() => setSelected(iso)}>+{dayItems.length - 2} more</button>}
               </div>
             );
           })}
         </div>
       </section>
       <aside className={styles.upNext}>
+        <span className={styles.eyebrow}>Day agenda</span>
+        <h3>{formatDate(selected, { weekday: 'short', day: 'numeric', month: 'short' })}</h3>
+        <div className={styles.selectedPlans}>
+          {selectedItems.map(item => <article key={item.id}><h4>{item.title}</h4><p>{item.detail || 'All day'}</p><ItemActions item={item} onEdit={onEdit} onDelete={onDelete} /></article>)}
+          {!selectedItems.length && <p>No plans for this day. Make room for something nice.</p>}
+          <button type="button" className={styles.secondaryButton} onClick={() => onAdd(selected)}>Add a plan for this day</button>
+        </div>
         <span className={styles.eyebrow}>Up next</span>
         <h3>Your plans</h3>
         {upcoming.length ? (
@@ -155,7 +186,7 @@ function Calendar({ items, cursor, setCursor, today, onEdit }) {
             {upcoming.map((item) => (
               <article key={item.id}>
                 <time dateTime={item.date}><strong>{formatDate(item.date, { day: '2-digit' })}</strong><span>{formatDate(item.date, { month: 'short' })}</span></time>
-                <div><h4>{item.title}</h4><p>{item.detail || 'All day'}</p></div>
+                <div><button type="button" className={styles.agendaLink} onClick={() => onEdit(item)}>{item.title}</button><p>{item.detail || 'All day'}</p></div>
               </article>
             ))}
           </div>
@@ -237,7 +268,7 @@ function EmptyState({ title, copy }) {
   return <div className={styles.emptyState}><span><Icon name="heart" /></span><h3>{title}</h3><p>{copy}</p></div>;
 }
 
-function AddDialog({ section, item, onClose, onSubmit }) {
+function AddDialog({ section, item, defaultDate, onClose, onSubmit, onDelete }) {
   const inputRef = useRef(null);
   const dialogRef = useRef(null);
   const meta = sectionMeta[section];
@@ -245,6 +276,8 @@ function AddDialog({ section, item, onClose, onSubmit }) {
 
   function submit(event) {
     event.preventDefault();
+    const title = event.currentTarget.elements.title;
+    if (!title.value.trim()) { title.setCustomValidity('Give your plan a title.'); title.reportValidity(); return; }
     const form = new FormData(event.currentTarget);
     onSubmit({
       title: String(form.get('title') || '').trim(),
@@ -262,10 +295,11 @@ function AddDialog({ section, item, onClose, onSubmit }) {
         <h2 id="add-dialog-title">{item ? `Edit ${meta.item}` : meta.action}</h2>
         <p>{item ? 'Update the details for everyone in this shared space.' : 'Add the details now. You can always refine the plan together later.'}</p>
         <form onSubmit={submit}>
-          <label>Title<input ref={inputRef} name="title" required maxLength="80" defaultValue={item?.title || ''} placeholder={section === 'tasks' ? 'What needs doing?' : `Name your ${section === 'calendar' ? 'activity' : 'idea'}`} /></label>
-          <label>Details<textarea name="detail" rows="3" maxLength="180" defaultValue={item?.detail || ''} placeholder="Add a useful note (optional)" /></label>
-          {(section === 'calendar' || section === 'tasks' || section === 'trips') && <label>Date<input name="date" type="date" required={section === 'calendar'} defaultValue={item?.date || ''} /></label>}
+          <label>Title<input ref={inputRef} name="title" onInput={event => event.currentTarget.setCustomValidity('')} required maxLength="80" defaultValue={item?.title || ''} placeholder={section === 'tasks' ? 'What needs doing?' : `Name your ${section === 'calendar' ? 'activity' : 'idea'}`} /></label>
+          <label>Details<textarea name="detail" rows="3" maxLength="6000" defaultValue={item?.detail || ''} placeholder={section === 'recipes' ? 'Ingredients, steps, and the little details that make it yours' : 'Notes, places, links, or anything you want to remember (optional)'} /></label>
+          {!['recipes', 'entertainment'].includes(section) && <label>{section === 'tasks' ? 'Due date (optional)' : section === 'calendar' ? 'Date' : 'Date (optional)'}<input name="date" type="date" required={section === 'calendar'} defaultValue={item?.date || defaultDate || ''} min="1900-01-01" max="9999-12-31" /></label>}
           {section !== 'calendar' && section !== 'tasks' && <label>Status or category<input name="tag" maxLength="30" defaultValue={item?.tag || ''} placeholder="e.g. Favourite, Planning" /></label>}
+          {item && <button className={styles.deleteButton} type="button" onClick={() => { onDelete(item.id); onClose(); }}>Delete {meta.item}</button>}
           <div className={styles.formActions}>
             <button type="button" onClick={onClose}>Cancel</button>
             <button type="submit">{item ? 'Save changes' : 'Save to our space'}</button>
@@ -276,13 +310,13 @@ function AddDialog({ section, item, onClose, onSubmit }) {
   );
 }
 
-function ShareDialog({ workspace, hasPlans, onClose }) {
+function ShareDialog({ workspace, hasPlans, inviteCode, beforeJoin, onInviteCreated, onClose }) {
   const dialogRef = useRef(null);
   const inputRef = useRef(null);
-  const [invite, setInvite] = useState(workspace.invite);
+  const [invite, setInvite] = useState(workspace.invite && new Date(workspace.invite.expiresAt) > new Date() ? workspace.invite : null);
   const [pending, setPending] = useState('');
   const [message, setMessage] = useState({ type: '', text: '' });
-  useDialogAccessibility(dialogRef, inputRef, onClose);
+  useDialogAccessibility(dialogRef, inputRef, onClose, Boolean(pending));
 
   async function createInvite() {
     setPending('invite');
@@ -291,6 +325,7 @@ function ShareDialog({ workspace, hasPlans, onClose }) {
       const result = await createPartnerInvite();
       if (result.ok) {
         setInvite(result.invite);
+        onInviteCreated(result.invite);
         setMessage({ type: 'success', text: 'Invite ready to share.' });
       } else {
         setMessage({ type: 'error', text: result.error });
@@ -301,10 +336,10 @@ function ShareDialog({ workspace, hasPlans, onClose }) {
     setPending('');
   }
 
-  async function copyInvite() {
+  async function copyInvite(link = false) {
     try {
-      await navigator.clipboard.writeText(invite.code);
-      setMessage({ type: 'success', text: 'Invite code copied.' });
+      await navigator.clipboard.writeText(link ? `${window.location.origin}/couple-planner?invite=${invite.code}` : invite.code);
+      setMessage({ type: 'success', text: link ? 'Invite link copied. Send it to your partner.' : 'Invite code copied.' });
     } catch {
       setMessage({ type: 'error', text: 'Copy failed. Select the code and copy it manually.' });
     }
@@ -313,12 +348,14 @@ function ShareDialog({ workspace, hasPlans, onClose }) {
   async function join(event) {
     event.preventDefault();
     if (hasPlans && !window.confirm('Joining your partner will permanently replace your current solo space and its plans. Continue?')) return;
+    const code = new FormData(event.currentTarget).get('code');
     setPending('join');
     setMessage({ type: '', text: '' });
     try {
-      const result = await joinPartnerSpace(new FormData(event.currentTarget).get('code'));
+      if (!(await beforeJoin())) { setMessage({ type: 'error', text: 'Save your latest changes before joining a different space.' }); setPending(''); return; }
+      const result = await joinPartnerSpace(code);
       if (result.ok) {
-        window.location.reload();
+        window.location.replace('/couple-planner');
         return;
       }
       setMessage({ type: 'error', text: result.error });
@@ -338,12 +375,12 @@ function ShareDialog({ workspace, hasPlans, onClose }) {
         <p id="share-dialog-copy">{workspace.memberCount > 1 ? 'Your partner is connected. Every change is saved to the same shared space.' : 'Invite your partner with a private code, or enter the code they sent you.'}</p>
         {workspace.memberCount < 2 && workspace.role === 'owner' && (
           <div className={styles.invitePanel}>
-            {invite ? <><span>Your invite code</span><strong>{invite.code}</strong><button type="button" onClick={copyInvite}>Copy code</button><small>Single-use code{expiry ? `, valid until ${expiry}` : ', valid for 7 days'}.</small></> : <button type="button" disabled={Boolean(pending)} onClick={createInvite}>{pending === 'invite' ? 'Creating…' : 'Create invite code'}</button>}
+            {invite ? <><span>Your invite code</span><strong>{invite.code}</strong><button type="button" onClick={() => copyInvite()}>Copy code</button><button type="button" onClick={() => copyInvite(true)}>Copy invite link</button><button type="button" disabled={Boolean(pending)} onClick={createInvite}>Replace invite code</button><small>Single-use code{expiry ? `, valid until ${expiry}` : ', valid for 7 days'}.</small></> : <button type="button" disabled={Boolean(pending)} onClick={createInvite}>{pending === 'invite' ? 'Creating…' : 'Create invite code'}</button>}
           </div>
         )}
         {workspace.memberCount < 2 && (
           <form className={styles.joinForm} onSubmit={join}>
-            <label>Join your partner<input ref={inputRef} name="code" minLength="6" maxLength="6" pattern="[A-Za-z0-9]{6}" autoCapitalize="characters" autoComplete="off" spellCheck="false" placeholder="ABC123" required /></label>
+            <label>Join your partner<input ref={inputRef} name="code" defaultValue={inviteCode} minLength="6" maxLength="6" pattern="[A-Za-z0-9]{6}" autoCapitalize="characters" autoComplete="off" spellCheck="false" placeholder="ABC123" required /></label>
             <button type="submit" disabled={Boolean(pending)}>{pending === 'join' ? 'Joining…' : 'Join space'}</button>
             {hasPlans && <small className={styles.joinWarning}>Joining replaces your current solo space and its plans.</small>}
           </form>
@@ -354,14 +391,23 @@ function ShareDialog({ workspace, hasPlans, onClose }) {
   );
 }
 
-export default function CouplePlannerDashboard({ userName, today, initialData = {}, workspace }) {
+export default function CouplePlannerDashboard({ userName, today, initialData = {}, workspace: initialWorkspace, inviteCode = '' }) {
+  const [workspace, setWorkspace] = useState(initialWorkspace);
   const [active, setActive] = useState('calendar');
   const [data, setData] = useState(() => ({ ...emptyData(), ...initialData }));
   const [currentDate, setCurrentDate] = useState(today);
   const [cursor, setCursor] = useState(() => new Date(`${today}T12:00:00`));
   const [dialogOpen, setDialogOpen] = useState(false);
+  const editorOpen = useRef(false);
+  editorOpen.current = dialogOpen;
   const [editingItem, setEditingItem] = useState(null);
-  const [shareOpen, setShareOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(Boolean(inviteCode) && initialWorkspace.memberCount < 2);
+  const [defaultDate, setDefaultDate] = useState('');
+  const [syncError, setSyncError] = useState('');
+  const [refreshError, setRefreshError] = useState('');
+  const baseData = useRef(initialData);
+  const syncRef = useRef('saved');
+  const refreshInFlight = useRef(false);
   const [syncState, setSyncState] = useState('saved');
   const [lastDeleted, setLastDeleted] = useState(null);
   const initialState = useRef(data);
@@ -388,28 +434,96 @@ export default function CouplePlannerDashboard({ userName, today, initialData = 
     return () => { mounted.current = false; };
   }, [today]);
 
+  const acceptRemote = useCallback((remote) => {
+    baseData.current = remote;
+    initialState.current = remote;
+    dataRef.current = remote;
+    setData(remote);
+  }, []);
+
   const enqueueSave = useCallback((snapshot, saveRevision) => {
-    const request = saveQueue.current.catch(() => null).then(() => saveCouplePlannerData(workspace.id, snapshot));
-    saveQueue.current = request;
-    return request.then((result) => {
-      const saved = Boolean(result?.ok);
-      if (mounted.current && saveRevision === revision.current) setSyncState(saved ? 'saved' : 'error');
-      return saved;
+    const request = saveQueue.current.catch(() => null).then(async () => {
+      const changes = plannerChanges(baseData.current, snapshot);
+      const result = await saveCouplePlannerData(workspace.id, changes.next, changes.base);
+      if (result?.ok) {
+        baseData.current = snapshot;
+        if (mounted.current && saveRevision === revision.current) {
+          if (!editorOpen.current) acceptRemote(result.data);
+          syncRef.current = 'saved';
+          setSyncState('saved');
+          setSyncError('');
+        }
+      } else if (mounted.current && saveRevision === revision.current) {
+        syncRef.current = 'error';
+        setSyncState('error');
+        setSyncError(result?.error || 'Your changes could not be saved. Please retry.');
+      }
+      return Boolean(result?.ok);
     }).catch(() => {
-      if (mounted.current && saveRevision === revision.current) setSyncState('error');
+      if (mounted.current && saveRevision === revision.current) {
+        syncRef.current = 'error';
+        setSyncState('error');
+        setSyncError('Your changes are still on this page. Check your connection, then retry.');
+      }
       return false;
     });
-  }, [workspace.id]);
+    saveQueue.current = request;
+    return request;
+  }, [workspace.id, acceptRemote]);
 
   useEffect(() => {
     dataRef.current = data;
     if (data === initialState.current) return;
     const saveRevision = ++revision.current;
+    syncRef.current = 'saving';
     setSyncState('saving');
     window.clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(() => enqueueSave(data, saveRevision), 700);
+    saveTimer.current = window.setTimeout(() => enqueueSave(data, saveRevision), 350);
     return () => window.clearTimeout(saveTimer.current);
   }, [data, enqueueSave]);
+
+  useEffect(() => {
+    async function refresh() {
+      if (document.hidden || editorOpen.current || syncRef.current !== 'saved' || refreshInFlight.current) return;
+      refreshInFlight.current = true;
+      const startedAt = revision.current;
+      try {
+        const result = await refreshCouplePlannerData(workspace.id);
+        if (mounted.current && startedAt === revision.current && !editorOpen.current && syncRef.current === 'saved') {
+          if (result.ok) { acceptRemote(result.data); setWorkspace(current => ({ ...current, role: result.role, memberCount: result.memberCount })); setRefreshError(''); }
+          else setRefreshError(result.error);
+        }
+      } catch {
+        if (mounted.current) setRefreshError('Live updates are unavailable. Check your connection.');
+      } finally { refreshInFlight.current = false; }
+    }
+    const interval = window.setInterval(refresh, 15000);
+    window.addEventListener('focus', refresh);
+    window.addEventListener('online', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('online', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [workspace.id, acceptRemote]);
+
+  useEffect(() => {
+    const warn = event => {
+      if (syncRef.current !== 'saved') { event.preventDefault(); event.returnValue = ''; }
+    };
+    const guardNavigation = event => {
+      const link = event.target.closest('a[href]');
+      const signOut = event.target.closest('form') && !event.target.closest('[data-planner]');
+      if ((link || signOut) && syncRef.current !== 'saved' && !window.confirm('Your latest changes have not saved yet. Leave this page anyway?')) {
+        event.preventDefault(); event.stopPropagation();
+      }
+    };
+    window.addEventListener('beforeunload', warn);
+    document.addEventListener('click', guardNavigation, true);
+    return () => { window.removeEventListener('beforeunload', warn); document.removeEventListener('click', guardNavigation, true); };
+  }, []);
 
   useEffect(() => {
     if (!lastDeleted) return undefined;
@@ -420,6 +534,7 @@ export default function CouplePlannerDashboard({ userName, today, initialData = 
   const saveNow = useCallback(() => {
     window.clearTimeout(saveTimer.current);
     const saveRevision = ++revision.current;
+    syncRef.current = 'saving';
     setSyncState('saving');
     return enqueueSave(dataRef.current, saveRevision);
   }, [enqueueSave]);
@@ -429,7 +544,8 @@ export default function CouplePlannerDashboard({ userName, today, initialData = 
   const hasPlans = useMemo(() => Object.values(data).some((items) => items.length > 0), [data]);
   const meta = sectionMeta[active];
 
-  function openAddDialog() {
+  function openAddDialog(date = '') {
+    setDefaultDate(typeof date === 'string' ? date : '');
     setEditingItem(null);
     setDialogOpen(true);
   }
@@ -440,6 +556,12 @@ export default function CouplePlannerDashboard({ userName, today, initialData = 
   }
 
   function saveItem(values) {
+    if (!editingItem && data[active].length >= 1000) {
+      setSyncError('This section is full. Remove an item before adding another.');
+      closeAddDialog();
+      return;
+    }
+    syncRef.current = 'saving';
     setData((current) => {
       if (editingItem) return { ...current, [active]: current[active].map((item) => item.id === editingItem.id ? { ...item, ...values } : item) };
       const id = globalThis.crypto?.randomUUID?.() || `${active}-${Date.now()}`;
@@ -452,12 +574,14 @@ export default function CouplePlannerDashboard({ userName, today, initialData = 
   function deleteItem(id) {
     const index = data[active].findIndex((item) => item.id === id);
     if (index < 0) return;
+    syncRef.current = 'saving';
     setLastDeleted({ section: active, index, item: data[active][index] });
     setData((current) => ({ ...current, [active]: current[active].filter((item) => item.id !== id) }));
   }
 
   function undoDelete() {
     if (!lastDeleted) return;
+    syncRef.current = 'saving';
     setData((current) => {
       const items = [...current[lastDeleted.section]];
       items.splice(Math.min(lastDeleted.index, items.length), 0, lastDeleted.item);
@@ -467,11 +591,19 @@ export default function CouplePlannerDashboard({ userName, today, initialData = 
   }
 
   function toggleTask(id) {
+    syncRef.current = 'saving';
     setData((current) => ({ ...current, tasks: current.tasks.map((task) => task.id === id ? { ...task, done: !task.done } : task) }));
   }
 
+  function downloadPlans() {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(dataRef.current, null, 2)], { type: 'application/json' }));
+    const anchor = document.createElement('a');
+    anchor.href = url; anchor.download = `our-plans-${currentDate}.json`; anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   const renderNavButton = (section, mobile = false) => (
-    <button className={active === section.id ? (mobile ? styles.activeMobileNav : styles.activeNav) : ''} type="button" key={section.id} onClick={() => setActive(section.id)} aria-current={active === section.id ? 'page' : undefined}>
+    <button className={active === section.id ? (mobile ? styles.activeMobileNav : styles.activeNav) : ''} type="button" aria-label={section.label} key={section.id} onClick={() => setActive(section.id)} aria-current={active === section.id ? 'page' : undefined}>
       <Icon name={section.icon} size={mobile ? 19 : 20} />
       <span>{mobile && section.label === 'Entertainment' ? 'Media' : section.label}</span>
       {!mobile && section.id === 'tasks' && pendingCount > 0 && <small>{pendingCount}</small>}
@@ -479,7 +611,7 @@ export default function CouplePlannerDashboard({ userName, today, initialData = 
   );
 
   return (
-    <div className={styles.app}>
+    <div className={styles.app} data-planner>
       <aside className={styles.sidebar}>
         <div className={styles.brand}><span><Icon name="heart" size={18} /></span><div><strong>Couple Planner</strong><small>Our shared space</small></div></div>
         <nav aria-label="Couple Planner sections">{sections.map((section) => renderNavButton(section))}</nav>
@@ -493,28 +625,32 @@ export default function CouplePlannerDashboard({ userName, today, initialData = 
           <div className={styles.brand}><span><Icon name="heart" size={17} /></span><div><strong>Couple Planner</strong><small>Our shared space</small></div></div>
           <button className={styles.avatars} type="button" onClick={() => setShareOpen(true)} aria-label="Manage shared space"><span>{userName.charAt(0).toUpperCase()}</span></button>
         </header>
-        <main className={styles.content}>
+        <div className={styles.content}>
           <div className={styles.pageHeader}>
             <div>
               <span className={styles.eyebrow}><Icon name="users" size={14} /> Made for two · {syncState === 'error' ? <button className={styles.syncRetry} type="button" onClick={saveNow}>Sync failed — retry</button> : <span aria-live="polite">{syncState === 'saving' ? 'Saving…' : 'Saved to cloud'}</span>}</span>
               <h1>{meta.title}</h1>
               <p>{meta.copy}</p>
             </div>
-            <button className={styles.primaryButton} type="button" onClick={openAddDialog}><Icon name="plus" size={18} />{meta.action}</button>
+            <button className={styles.primaryButton} data-add-plan type="button" onClick={openAddDialog}><Icon name="plus" size={18} />{meta.action}</button>
           </div>
+          {syncError && <div className={styles.errorBanner} role="alert"><p>{syncError}</p><button type="button" onClick={saveNow} disabled={syncState === 'saving'}>Retry save</button><button type="button" onClick={downloadPlans}>Download my plans</button><button type="button" onClick={() => { if (window.confirm('Load the saved plans? Unsaved changes on this page will be discarded. Download them first if you want to keep them.')) { syncRef.current = 'saved'; window.location.reload(); } }}>Load latest plans</button></div>}
+          {refreshError && <p className={styles.errorBanner} role="status">{refreshError} Updates retry automatically.</p>}
+          {workspace.memberCount < 2 && <div className={styles.welcome}><div><strong>A little space for the two of you.</strong><p>Start with a plan, then invite your partner to make it yours together.</p></div><button type="button" onClick={() => setShareOpen(true)}>Invite your partner</button></div>}
           <div className={styles.summary} aria-label="Planner summary">
             <span><strong>{upcomingCount}</strong> upcoming plans</span><span aria-hidden="true">•</span>
             <span><strong>{pendingCount}</strong> open tasks</span><span aria-hidden="true">•</span>
             <span><strong>{data.dates.length + data.trips.length}</strong> saved adventures</span>
           </div>
-          {active === 'calendar' && <Calendar items={data.calendar} cursor={cursor} setCursor={setCursor} today={currentDate} onEdit={openEditDialog} />}
+          {active === 'calendar' && <Calendar items={data.calendar} cursor={cursor} setCursor={setCursor} today={currentDate} onEdit={openEditDialog} onAdd={openAddDialog} onDelete={deleteItem} />}
           {active === 'tasks' && <TaskList items={data.tasks} onToggle={toggleTask} onEdit={openEditDialog} onDelete={deleteItem} />}
           {!['calendar', 'tasks'].includes(active) && <Collection items={data[active]} section={active} onEdit={openEditDialog} onDelete={deleteItem} />}
-        </main>
+          <div className={styles.dataFooter}><span>Private to your shared space. Updates every 15 seconds.</span><button type="button" onClick={downloadPlans}>Download our plans</button></div>
+        </div>
         <nav className={styles.mobileNav} aria-label="Couple Planner sections">{sections.map((section) => renderNavButton(section, true))}</nav>
       </div>
-      {dialogOpen && <AddDialog section={active} item={editingItem} onClose={closeAddDialog} onSubmit={saveItem} />}
-      {shareOpen && <ShareDialog workspace={workspace} hasPlans={hasPlans} onClose={closeShareDialog} />}
+      {dialogOpen && <AddDialog section={active} item={editingItem} defaultDate={defaultDate} onDelete={deleteItem} onClose={closeAddDialog} onSubmit={saveItem} />}
+      {shareOpen && <ShareDialog onInviteCreated={invite => setWorkspace(current => ({ ...current, invite }))} beforeJoin={() => syncRef.current === 'saved' ? Promise.resolve(true) : saveNow()} workspace={workspace} inviteCode={inviteCode} hasPlans={hasPlans} onClose={closeShareDialog} />}
       {lastDeleted && <div className={styles.undoToast} role="status"><span>“{lastDeleted.item.title}” deleted</span><button type="button" onClick={undoDelete}>Undo</button></div>}
     </div>
   );
