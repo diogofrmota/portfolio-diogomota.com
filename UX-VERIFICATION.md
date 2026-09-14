@@ -5,7 +5,7 @@ Verified on 2026-09-14 against the local production build at http://localhost:31
 ## Results
 
 - `npm run build`: passed before verification and after the accessibility fix.
-- Desktop (1440 × 900) and mobile (390 × 900): `/`, `/apps`, `/login`, registration mode, `/tvsync`, `/couple-planner`, and `/fithub` rendered successfully. Protected routes were checked signed out and signed in. No document-level horizontal overflow was measured.
+- Desktop (1440 Ã— 900) and mobile (390 Ã— 900): `/`, `/apps`, `/login`, registration mode, `/tvsync`, `/couple-planner`, and `/fithub` rendered successfully. Protected routes were checked signed out and signed in. No document-level horizontal overflow was measured.
 - `/` retains the dark background, monospace text, compact content, plain links, and bracketed apps navigation. `/apps` retains the modern public app picker required by AGENTS.md.
 - Signed-out app routes redirect to `/login` with their callback destinations. Deep TVSync paths and Couple Planner invite query parameters survive switching login/register modes. External callback URLs are rejected.
 - Signed-in `/apps` displays the shared identity and direct app links. Signed-in `/login` returns to the picker with the selected deep-link destination preserved.

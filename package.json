@@ -1,6 +1,8 @@
 {
   "private": true,
   "scripts": {
+    "check:encoding": "node scripts/check-utf8.mjs",
+    "prebuild": "npm run check:encoding",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

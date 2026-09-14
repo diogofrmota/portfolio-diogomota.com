@@ -1,0 +1,19 @@
+* text=auto eol=lf
+
+*.css text
+*.js text
+*.json text
+*.jsx text
+*.md text
+*.mdx text
+*.mjs text
+*.scss text
+*.sql text
+*.ts text
+*.tsx text
+*.yaml text
+*.yml text
+
+*.ico binary
+*.ttf binary
+
