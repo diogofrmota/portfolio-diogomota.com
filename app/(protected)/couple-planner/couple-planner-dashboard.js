@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPartnerInvite, joinPartnerSpace, saveCouplePlannerData, refreshCouplePlannerData } from './actions';
 import { plannerChanges } from '../../../lib/couple-planner-model.mjs';
 import styles from './couple-planner.module.css';
+import useAppSection from '../../components/use-app-section';
 
 const sections = [
   { id: 'calendar', label: 'Calendar', icon: 'calendar' },
@@ -393,7 +394,7 @@ function ShareDialog({ workspace, hasPlans, inviteCode, beforeJoin, onInviteCrea
 
 export default function CouplePlannerDashboard({ userName, today, initialData = {}, workspace: initialWorkspace, inviteCode = '' }) {
   const [workspace, setWorkspace] = useState(initialWorkspace);
-  const [active, setActive] = useState('calendar');
+  const [active] = useAppSection('couple-planner');
   const [data, setData] = useState(() => ({ ...emptyData(), ...initialData }));
   const [currentDate, setCurrentDate] = useState(today);
   const [cursor, setCursor] = useState(() => new Date(`${today}T12:00:00`));
@@ -602,29 +603,11 @@ export default function CouplePlannerDashboard({ userName, today, initialData = 
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  const renderNavButton = (section, mobile = false) => (
-    <button className={active === section.id ? (mobile ? styles.activeMobileNav : styles.activeNav) : ''} type="button" aria-label={section.label} key={section.id} onClick={() => setActive(section.id)} aria-current={active === section.id ? 'page' : undefined}>
-      <Icon name={section.icon} size={mobile ? 19 : 20} />
-      <span>{mobile && section.label === 'Entertainment' ? 'Media' : section.label}</span>
-      {!mobile && section.id === 'tasks' && pendingCount > 0 && <small>{pendingCount}</small>}
-    </button>
-  );
-
   return (
     <div className={styles.app} data-planner>
-      <aside className={styles.sidebar}>
-        <div className={styles.brand}><span><Icon name="heart" size={18} /></span><div><strong>Couple Planner</strong><small>Our shared space</small></div></div>
-        <nav aria-label="Couple Planner sections">{sections.map((section) => renderNavButton(section))}</nav>
-        <button className={styles.sidebarFooter} type="button" onClick={() => setShareOpen(true)}>
-          <div className={styles.avatars} aria-hidden="true"><span>{userName.charAt(0).toUpperCase()}</span><span>{workspace.memberCount > 1 ? '✓' : '+'}</span></div>
-          <div><strong>{userName}</strong><small>{workspace.memberCount > 1 ? 'Partner connected' : 'Invite your partner'}</small></div>
-        </button>
-      </aside>
+
       <div className={styles.workspace}>
-        <header className={styles.mobileHeader}>
-          <div className={styles.brand}><span><Icon name="heart" size={17} /></span><div><strong>Couple Planner</strong><small>Our shared space</small></div></div>
-          <button className={styles.avatars} type="button" onClick={() => setShareOpen(true)} aria-label="Manage shared space"><span>{userName.charAt(0).toUpperCase()}</span></button>
-        </header>
+
         <div className={styles.content}>
           <div className={styles.pageHeader}>
             <div>
@@ -637,6 +620,7 @@ export default function CouplePlannerDashboard({ userName, today, initialData = 
           {syncError && <div className={styles.errorBanner} role="alert"><p>{syncError}</p><button type="button" onClick={saveNow} disabled={syncState === 'saving'}>Retry save</button><button type="button" onClick={downloadPlans}>Download my plans</button><button type="button" onClick={() => { if (window.confirm('Load the saved plans? Unsaved changes on this page will be discarded. Download them first if you want to keep them.')) { syncRef.current = 'saved'; window.location.reload(); } }}>Load latest plans</button></div>}
           {refreshError && <p className={styles.errorBanner} role="status">{refreshError} Updates retry automatically.</p>}
           {workspace.memberCount < 2 && <div className={styles.welcome}><div><strong>A little space for the two of you.</strong><p>Start with a plan, then invite your partner to make it yours together.</p></div><button type="button" onClick={() => setShareOpen(true)}>Invite your partner</button></div>}
+          <button className={styles.secondaryButton} type="button" onClick={() => setShareOpen(true)}>Manage shared space</button>
           <div className={styles.summary} aria-label="Planner summary">
             <span><strong>{upcomingCount}</strong> upcoming plans</span><span aria-hidden="true">•</span>
             <span><strong>{pendingCount}</strong> open tasks</span><span aria-hidden="true">•</span>
@@ -647,7 +631,7 @@ export default function CouplePlannerDashboard({ userName, today, initialData = 
           {!['calendar', 'tasks'].includes(active) && <Collection items={data[active]} section={active} onEdit={openEditDialog} onDelete={deleteItem} />}
           <div className={styles.dataFooter}><span>Private to your shared space. Updates every 15 seconds.</span><button type="button" onClick={downloadPlans}>Download our plans</button></div>
         </div>
-        <nav className={styles.mobileNav} aria-label="Couple Planner sections">{sections.map((section) => renderNavButton(section, true))}</nav>
+
       </div>
       {dialogOpen && <AddDialog section={active} item={editingItem} defaultDate={defaultDate} onDelete={deleteItem} onClose={closeAddDialog} onSubmit={saveItem} />}
       {shareOpen && <ShareDialog onInviteCreated={invite => setWorkspace(current => ({ ...current, invite }))} beforeJoin={() => syncRef.current === 'saved' ? Promise.resolve(true) : saveNow()} workspace={workspace} inviteCode={inviteCode} hasPlans={hasPlans} onClose={closeShareDialog} />}

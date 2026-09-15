@@ -58,8 +58,13 @@ The simple homepage and the modern product UI must be able to evolve independent
 - `app/page.js`: simple public homepage; preserve its visual language.
 - `app/apps/page.js` and `app/apps/apps-client.js`: modern public product hub and app picker for the three mini-apps; authenticated and unauthenticated states share this route.
 - `app/login/page.js`: modern login/register experience.
-- `app/(protected)/layout.js`: server-side authentication boundary and shared authenticated shell.
-- `app/(protected)/*`: modern app experiences.
+- `app/(protected)/layout.js`: server-side authentication boundary and initial per-app theme cookie reader.
+- `app/components/app-shell.js`: scoped theme state and the single active-app header.
+- `app/components/product-header.js`: shared app identity, section links, text-only Account panel, theme controls, Change app, and sign-out.
+- `lib/app-sections.js` and `app/components/use-app-section.js`: app section definitions and fragment navigation.
+- `app/(protected)/*`: modern app experiences; do not add nested app header bars or duplicate mobile navigation.
+- `lib/fithub-model.mjs`: fitness state validation and legacy completion migration; shared with client initialization and tests.
+- `lib/fithub.js` and `app/(protected)/fithub/actions.js`: per-user fitness database access and authenticated saves.
 
 ## Validation
 
@@ -70,3 +75,51 @@ For UI work:
 3. Check the modern `/apps` hub, login, registration, and affected mini-app routes at mobile and desktop widths.
 4. Verify keyboard navigation, focus visibility, dialog close behavior, and authentication redirects.
 5. Preserve unrelated user changes already present in the working tree.
+
+## Unified product navigation and preferences
+
+- Keep `/apps` as a polished, footer-free picker. The homepage remains unchanged.
+- Each mini-app has one header based on TVSync's established visual design:
+  app identity, app-specific section links, and the visible word `Account` only.
+  Do not add shared `dm/apps` branding or global app tabs to protected routes.
+- Place Change app, per-app Light/Dark selection, and sign-out inside Account.
+  Keep Escape/focus restoration, outside pointer/focus dismissal, and selection
+  dismissal. Preserve partner management through Manage shared space.
+- Use the shared fragment navigation definitions. On narrow screens keep the
+  identity and Account accessible, with horizontally scrollable section links.
+- Maintain TVSync's amber, Couple Planner's coral, and FitHub's green identities.
+  Theme all surfaces and feedback, including TVSync media/season routes.
+- Theme cookies (`app-theme-tvsync`, `app-theme-couple-planner`,
+  `app-theme-fithub`) are browser preferences, not authentication. Read and
+  validate them in the protected server layout. Set explicit CSS `color-scheme`
+  selectors for both themes so the compiler's `light-dark()` fallback works;
+  an inline color-scheme alone is insufficient for compiled color fallbacks.
+- Keep public homepage/auth/hub styles isolated from protected theme preferences.
+
+## FitHub state and history
+
+- Reuse the existing `fithub_state.data` JSONB record and authenticated save action.
+- `goalHistory` stores date-specific completion IDs. Migrate the legacy single-day
+  fields on read; explicit history wins when present. Never drop history merely
+  because a goal is edited or removed. Gym activity and workouts stay independent.
+- Goals support add/edit/remove/undo and per-date completion. Validate names,
+  dates, duplicates, and capacity on the server as well as in the form.
+- Preserve save ordering, retry feedback, and unsaved-navigation protection.
+  The existing full-state persistence is last-write-wins across tabs; do not
+  describe it as conflict-safe. The checklist's current day is UTC.
+- Habit squares must communicate dates and counts without relying on color,
+  support arrow keys, and remain usable without causing mobile page overflow.
+
+## Additional verification
+
+- Run `npm run test:fithub` for migration and date/history regressions, plus the
+  existing planner tests, encoding check, and production build.
+- Check each mini-app in both themes at desktop/mobile widths. Assert rendered
+  background/text colors, not just theme attributes; verify reload and app-switch
+  persistence. Check the homepage and auth screens after product navigation.
+- Verify one header per route, section URLs and browser history, Account keyboard
+  navigation/Escape/outside dismissal, app switching, and sign-out callbacks.
+- Verify goal CRUD, removal undo, independent dates, reload persistence, and both
+  trackers against actual stored state when database access is available. Exercise
+  pending/failed saves and retry. Use isolated temporary test identities and clean
+  up their data; never use an existing user's records for destructive tests.

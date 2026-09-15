@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { searchMedia, toggleLibraryItem, updateLibraryItem } from './actions';
 import styles from './tvsync.module.css';
+import useAppSection from '../../components/use-app-section';
 
 const navItems = [
   { id: 'explore', label: 'Explore', icon: 'compass' },
@@ -85,7 +86,7 @@ function Details({ item, libraryItem, pending, onClose, onToggle, onUpdate }) {
 }
 
 export default function TVSyncDashboard({ discovery, initialLibrary, tmdbConfigured }) {
-  const [active, setActive] = useState('explore');
+  const [active, setActive] = useAppSection('tvsync');
   const [library, setLibrary] = useState(initialLibrary);
   const [selected, setSelected] = useState(null);
   const [searchResults, setSearchResults] = useState(null);
@@ -98,6 +99,8 @@ export default function TVSyncDashboard({ discovery, initialLibrary, tmdbConfigu
   const featured = discovery[0];
   const movies = discovery.filter((item) => item.mediaType === 'movie');
   const shows = discovery.filter((item) => item.mediaType === 'tv');
+
+  useEffect(() => { setSearchResults(null); setSearchQuery(''); }, [active]);
 
   function switchView(view) { setActive(view); setSearchResults(null); setSearchQuery(''); window.scrollTo({ top: 0, behavior: 'smooth' }); }
   function toggleItem(item) {
@@ -142,14 +145,14 @@ export default function TVSyncDashboard({ discovery, initialLibrary, tmdbConfigu
 
   return (
     <div className={styles.app}>
-      <header className={styles.header}><button className={styles.logo} type="button" onClick={() => switchView('explore')}>Tv<span>Sync</span></button><nav aria-label="TVSync navigation">{navItems.map((item) => <button className={active === item.id ? styles.activeNav : ''} type="button" aria-current={active === item.id ? "page" : undefined} key={item.id} onClick={() => switchView(item.id)}><Icon name={item.icon} size={18} />{item.label}{item.id === 'library' && library.length > 0 && <small>{library.length}</small>}</button>)}</nav></header>
+
       <div className={styles.main}>
         <form className={styles.search} role="search" onSubmit={submitSearch}><Icon name="search" /><input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search movies and TV shows" aria-label="Search movies and TV shows" /><button type="submit" disabled={isPending || searchQuery.trim().length < 2}>{isPending ? 'Searching…' : 'Search'}</button></form>
         {!tmdbConfigured && <div className={styles.configurationNote}><strong>Catalogue unavailable</strong><span>Discovery and search will return when the media service is configured.</span></div>}
         {!featured && searchResults === null && active === 'explore' && <div className={styles.empty}><Icon name="compass" size={30} /><h2>No catalogue titles available</h2><p>Your personal library is still available. Discovery requires the media service.</p><button type="button" onClick={() => switchView('library')}>Open my library <Icon name="chevron" size={16} /></button></div>}
         {searchResults !== null ? <section className={styles.results}><div className={styles.pageTitle}><div><span>Search</span><h1>Results for “{searchQuery}”</h1></div><button type="button" onClick={() => { setSearchResults(null); setSearchQuery(''); }}>Clear search</button></div>{searchResults.length ? <div className={styles.posterGrid}>{searchResults.map((item) => <MediaCard item={item} saved={libraryKeys.has(mediaKey(item))} pending={pendingKey === mediaKey(item)} onOpen={setSelected} onToggle={toggleItem} key={mediaKey(item)} />)}</div> : <div className={styles.empty}><Icon name="search" size={28} /><h2>No titles found</h2><p>Try a different movie or show name.</p></div>}</section> : active === 'explore' ? <>{featured && <section className={styles.hero}>{backdropUrl(featured.backdropPath) && <Image src={backdropUrl(featured.backdropPath)} alt="" fill priority sizes="(max-width: 1200px) 100vw, 1200px" />}<div className={styles.heroShade} /><div className={styles.heroContent}><span className={styles.mediaType}>Featured {featured.mediaType === 'movie' ? 'movie' : 'TV show'}</span><h1>{featured.title}</h1>{featured.voteAverage > 0 && <div className={styles.heroRating}><Icon name="star" filled size={17} />{Number(featured.voteAverage).toFixed(1)} <small>TMDB</small></div>}<p>{featured.overview}</p><div><button className={styles.goldButton} type="button" onClick={() => setSelected(featured)}><Icon name="play" filled size={17} />View details</button><button className={styles.secondaryButton} type="button" onClick={() => toggleItem(featured)}><Icon name={libraryKeys.has(mediaKey(featured)) ? 'check' : 'plus'} size={17} />{libraryKeys.has(mediaKey(featured)) ? 'In my library' : 'Add to library'}</button></div></div></section>}<Rail title="Trending now" copy="The titles everyone is talking about." items={discovery.slice(0, 6)} libraryKeys={libraryKeys} pendingKey={pendingKey} onOpen={setSelected} onToggle={toggleItem} /><Rail title="Movies worth watching" copy="Find the next film for your list." items={movies.slice(0, 6)} libraryKeys={libraryKeys} pendingKey={pendingKey} onOpen={setSelected} onToggle={toggleItem} /><Rail title="TV shows to start next" copy="One episode is all it takes." items={shows.slice(0, 6)} libraryKeys={libraryKeys} pendingKey={pendingKey} onOpen={setSelected} onToggle={toggleItem} /></> : <section className={styles.browse}><div className={styles.pageTitle}><div><span>{active === 'library' ? 'Your collection' : 'Discover'}</span><h1>{navItems.find((item) => item.id === active)?.label}</h1><p>{active === 'library' ? 'Everything you saved, with progress that follows you.' : `Browse trending ${active === 'movies' ? 'films' : 'series'} and save what looks good.`}</p></div>{active === 'library' && <strong>{library.length} {library.length === 1 ? 'title' : 'titles'}</strong>}</div>{visible.length ? <div className={styles.posterGrid}>{visible.map((item) => <MediaCard item={item} saved={libraryKeys.has(mediaKey(item))} pending={pendingKey === mediaKey(item)} onOpen={setSelected} onToggle={toggleItem} key={mediaKey(item)} />)}</div> : <div className={styles.empty}><Icon name="bookmark" size={30} /><h2>Your library is waiting</h2><p>Save a movie or TV show and it will appear here on every device.</p><button type="button" onClick={() => switchView('explore')}>Explore titles <Icon name="chevron" size={16} /></button></div>}</section>}
       </div>
-      <nav className={styles.mobileNav} aria-label="TVSync mobile navigation">{navItems.map((item) => <button className={active === item.id ? styles.activeMobileNav : ''} type="button" aria-current={active === item.id ? "page" : undefined} key={item.id} onClick={() => switchView(item.id)}><Icon name={item.icon} size={19} /><span>{item.id === 'library' ? 'Library' : item.label}</span></button>)}</nav>
+
       {selected && <Details item={selected} libraryItem={currentSelected} pending={pendingKey === mediaKey(selected)} onClose={() => setSelected(null)} onToggle={toggleItem} onUpdate={updateItem} />}
       {notice && <div className={styles.toast} role="status">{notice}</div>}
     </div>

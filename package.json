@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "db:migrate": "node database/migrate.mjs",
+    "test:fithub": "node --test tests/fithub.test.mjs",
     "test:couple-planner": "node --test tests/couple-planner.test.mjs",
     "test:couple-planner:db": "node --experimental-default-type=module tests/couple-planner.integration.mjs"
   },

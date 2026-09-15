@@ -1,16 +1,18 @@
 import { redirect } from 'next/navigation';
 import { auth } from '../../auth';
-import ProductHeader from '../components/product-header';
-import styles from './protected-layout.module.css';
+import { cookies } from 'next/headers';
+import AppShell from '../components/app-shell';
 
 export default async function ProtectedLayout({ children }) {
   const session = await auth();
   if (!session?.user) redirect('/login');
+  const preferences = await cookies();
+  const initialThemes = Object.fromEntries(['tvsync', 'couple-planner', 'fithub'].map((app) => {
+    const value = preferences.get(`app-theme-${app}`)?.value;
+    return [app, ['light', 'dark'].includes(value) ? value : app === 'tvsync' ? 'dark' : 'light'];
+  }));
 
   return (
-    <div className={styles.shell}>
-      <ProductHeader user={{ name: session.user.name, email: session.user.email }} />
-      <main id="product-content" tabIndex={-1} className={styles.main}>{children}</main>
-    </div>
+    <AppShell user={{ name: session.user.name, email: session.user.email }} initialThemes={initialThemes}>{children}</AppShell>
   );
 }

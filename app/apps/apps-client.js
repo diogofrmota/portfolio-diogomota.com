@@ -118,12 +118,7 @@ export default function AppsClient({ user, callbackUrl }) {
         )}
       </main>
 
-      <footer className={styles.footer}>
-        <span>Made by Diogo Mota</span>
-        <Link href="/">
-          Back to home <span aria-hidden="true">↗</span>
-        </Link>
-      </footer>
+
     </div>
   );
 }

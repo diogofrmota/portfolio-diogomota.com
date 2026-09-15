@@ -1,13 +1,13 @@
 .shell {
-  --product-header-height: 72px;
+  --product-header-height: 66px;
   --product-gutter: clamp(16px, 3vw, 40px);
   --product-content-width: 1280px;
   --product-section-space: 32px;
   --product-font: Arial, Helvetica, sans-serif;
   min-height: 100svh;
-  background: #f4f7f5;
-  color: #142019;
-  color-scheme: light;
+  background: var(--app-background);
+  color: var(--app-text);
+
   font-family: var(--product-font);
 }
 .shell :is(button, input, select, textarea) { font-family: inherit; }
@@ -17,7 +17,39 @@
 .main:focus { outline: none; }
 .status { max-width: 640px; margin: 0 auto; padding: 64px var(--product-gutter); }
 .status h1 { font-size: 28px; letter-spacing: -.03em; }
-.status p { color: #526358; line-height: 1.6; }
+.status p { color: var(--app-muted); line-height: 1.6; }
 .status button { min-height: 44px; margin-top: 24px; padding: 0 20px; border-radius: 10px; background: #173c25; color: white; text-decoration: none; }
-@media (max-width: 760px) { .shell { --product-header-height: 116px; --product-section-space: 24px; } }
+@media (max-width: 1100px) { .shell { --product-header-height: 110px; --product-section-space: 24px; } }
 @media (prefers-reduced-motion: reduce) { .shell *, .shell *::before, .shell *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
+
+.shell {
+  --app-background: light-dark(#f4f7f5, #101a14);
+  --app-surface: light-dark(#ffffff, #18251d);
+  --app-text: light-dark(#142019, #eef5ef);
+  --app-muted: light-dark(#53665a, #afc4b5);
+  --app-border: light-dark(#d5e1d9, #374b3e);
+  --app-hover: light-dark(#e5f0e8, #263a2d);
+  --app-accent: light-dark(#17652e, #91dd9c);
+}
+.shell[data-app='tvsync'] {
+  --app-background: light-dark(#f8f7f3, #050606);
+  --app-surface: light-dark(#ffffff, #101414);
+  --app-text: light-dark(#24231f, #ffffff);
+  --app-muted: light-dark(#60615c, #a7afad);
+  --app-border: light-dark(#dadbd4, #202625);
+  --app-hover: light-dark(#eeeadf, #232720);
+  --app-accent: light-dark(#906400, #fbbf24);
+}
+.shell[data-app='couple-planner'] {
+  --app-background: light-dark(#fbf6f1, #201816);
+  --app-surface: light-dark(#fffdfb, #2c211e);
+  --app-text: light-dark(#2a1714, #faeae5);
+  --app-muted: light-dark(#74635f, #ceb5ad);
+  --app-border: light-dark(#e6dcd8, #503a33);
+  --app-hover: light-dark(#ffebe6, #422b26);
+  --app-accent: light-dark(#bd2d25, #ff998a);
+}
+.shell section[id] { scroll-margin-top: calc(var(--product-header-height) + 20px); }
+
+.shell[data-theme="light"] { color-scheme: light; }
+.shell[data-theme="dark"] { color-scheme: dark; }

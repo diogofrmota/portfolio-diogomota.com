@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { saveFithubState } from './actions';
+import { normalizeFithubState } from '../../../lib/fithub-model.mjs';
 import styles from './fithub.module.css';
 
 const dayNames = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
@@ -105,8 +106,8 @@ function ActivityGrid({ activity, today, visitCount }) {
   }, [weeks]);
 
   return (
-    <div className={styles.chartScroll} role="img" aria-label={`${visitCount} gym ${visitCount === 1 ? 'visit' : 'visits'} logged over the last year`}>
-      <div className={styles.chart} aria-hidden="true">
+    <div className={styles.chartScroll} tabIndex={0} role="region" aria-label={`${visitCount} gym ${visitCount === 1 ? 'visit' : 'visits'} logged over the last year`}>
+      <div className={styles.chart}>
         <div className={styles.months} aria-hidden="true">
           {months.map((month) => <span key={`${month.label}-${month.index}`} style={{ gridColumnStart: month.index + 1 }}>{month.label}</span>)}
         </div>
@@ -121,7 +122,7 @@ function ActivityGrid({ activity, today, visitCount }) {
                   <span
                     className={`${styles.activityDay} ${styles[`level${day.level}`]} ${day.date === today ? styles.today : ''}`}
                     key={day.date}
-                    title={`${day.date}: ${day.level ? 'gym visit logged' : 'no gym visit'}`}
+                    role="img" aria-label={`${day.date}: ${day.level ? 'gym visit logged' : 'no gym visit'}`} title={`${day.date}: ${day.level ? 'gym visit logged' : 'no gym visit'}`}
                   />
                 ))}
               </div>
@@ -133,9 +134,33 @@ function ActivityGrid({ activity, today, visitCount }) {
   );
 }
 
+function HabitGrid({ today, history, selectedDate, onSelect }) {
+  const days = useMemo(() => buildActivity(today).filter((day) => day.date <= today), [today]);
+  const scroll = useRef(null);
+  useEffect(() => { if (scroll.current) scroll.current.scrollLeft = scroll.current.scrollWidth; }, []);
+  const counts = new Map(history.map((day) => [day.date, day.completed.length]));
+  return <><div className={styles.habitRange}><span>{days[0].date}</span><span>{today}</span></div><div ref={scroll} className={styles.habitScroll} tabIndex={0} role="region" aria-label="Daily goal completion calendar, scroll horizontally for more dates">
+    <div className={styles.habitGrid}>{days.map(({ date }) => {
+      const count = counts.get(date) ?? 0;
+      return <button key={date} data-date={date} tabIndex={date === (days.some(day => day.date === selectedDate) ? selectedDate : today) ? 0 : -1} onKeyDown={(event) => {
+        const offset = { ArrowUp: -1, ArrowDown: 1, ArrowLeft: -7, ArrowRight: 7 }[event.key];
+        if (!offset) return;
+        event.preventDefault();
+        const index = days.findIndex(day => day.date === date);
+        const target = days[Math.max(0, Math.min(days.length - 1, index + offset))];
+        scroll.current?.querySelector(`[data-date="${target.date}"]`)?.focus();
+      }} type="button" className={`${styles.habitDay} ${styles[`level${Math.min(4, count)}`]}`} aria-label={`${date}: ${count} completed ${count === 1 ? 'goal' : 'goals'}. Review this day`} aria-pressed={date === selectedDate} title={`${date}: ${count} completed goals`} onClick={() => onSelect(date)}>{count || '·'}</button>;
+    })}</div>
+  </div></>;
+}
+
 export default function FithubDashboard({ today, initialState = {} }) {
   const [goals, setGoals] = useState(() => initialState.goals ?? []);
-  const [completed, setCompleted] = useState(() => initialState.completedDate === today ? initialState.completed ?? [] : []);
+  const [selectedDate, setSelectedDate] = useState(today);
+  const [goalHistory, setGoalHistory] = useState(() => normalizeFithubState(initialState).goalHistory);
+  const completed = goalHistory.find((day) => day.date === selectedDate)?.completed ?? [];
+  const [editingGoal, setEditingGoal] = useState(null);
+  const [goalError, setGoalError] = useState('');
   const [activity, setActivity] = useState(() => mergeActivity(initialState.activity, today));
   const [workouts, setWorkouts] = useState(() => initialState.workouts ?? []);
   const [showGoalForm, setShowGoalForm] = useState(false);
@@ -143,35 +168,56 @@ export default function FithubDashboard({ today, initialState = {} }) {
   const [syncState, setSyncState] = useState('saved');
   const [saveAttempt, setSaveAttempt] = useState(0);
   const [deletedItem, setDeletedItem] = useState(null);
-  const firstSave = useRef(true);
+  const lastQueuedState = useRef(null);
+  const dirty = useRef(false);
   const saveQueue = useRef(Promise.resolve());
   const saveRevision = useRef(0);
   const goalInputRef = useRef(null);
   const workoutTitleRef = useRef(null);
 
   useEffect(() => {
-    if (firstSave.current) {
-      firstSave.current = false;
-      return;
-    }
+    const nextState = { goals, goalHistory, activity, workouts };
+    const serialized = JSON.stringify(nextState);
+    if (lastQueuedState.current === null) { lastQueuedState.current = serialized; return; }
+    if (lastQueuedState.current === serialized && !saveAttempt) return;
+    lastQueuedState.current = serialized;
     const revision = ++saveRevision.current;
-    const nextState = { goals, completed, completedDate: today, activity, workouts };
+    dirty.current = true;
     setSyncState('saving');
-    const timeout = window.setTimeout(() => {
-      const request = saveQueue.current.catch(() => undefined).then(() => saveFithubState(nextState));
-      saveQueue.current = request;
-      request.then(() => {
-        if (revision === saveRevision.current) setSyncState('saved');
-      }).catch(() => {
-        if (revision === saveRevision.current) setSyncState('error');
-      });
-    }, 700);
-    return () => window.clearTimeout(timeout);
-  }, [activity, completed, goals, saveAttempt, today, workouts]);
+    const request = saveQueue.current.catch(() => undefined).then(() => saveFithubState(nextState));
+    saveQueue.current = request;
+    request.then(() => {
+      if (revision === saveRevision.current) { dirty.current = false; setSyncState('saved'); setGoalError((message) => message.startsWith('Your changes are not saved') ? '' : message); }
+    }).catch(() => {
+      if (revision === saveRevision.current) setSyncState('error');
+    });
+  }, [activity, goalHistory, goals, saveAttempt, workouts]);
+
+  useEffect(() => {
+    const beforeUnload = (event) => { if (dirty.current) { event.preventDefault(); event.returnValue = ''; } };
+    const beforeNavigate = (event) => {
+      const link = event.target.closest?.('a[href]');
+      if (dirty.current && link && new URL(link.href).pathname !== window.location.pathname) {
+        event.preventDefault();
+        event.stopPropagation();
+        setGoalError('Your changes are not saved yet. Wait for saving to finish, or retry the failed save before leaving.');
+      }
+    };
+    const beforeSignOut = (event) => {
+      if (dirty.current && event.target.matches('[data-account-signout]')) {
+        event.preventDefault(); event.stopPropagation();
+        setGoalError('Your changes are not saved yet. Retry the save before signing out.');
+      }
+    };
+    document.addEventListener('submit', beforeSignOut, true);
+    window.addEventListener('beforeunload', beforeUnload);
+    document.addEventListener('click', beforeNavigate, true);
+    return () => { document.removeEventListener('submit', beforeSignOut, true); window.removeEventListener('beforeunload', beforeUnload); document.removeEventListener('click', beforeNavigate, true); };
+  }, []);
 
   useEffect(() => {
     if (showGoalForm) goalInputRef.current?.focus();
-  }, [showGoalForm]);
+  }, [showGoalForm, editingGoal]);
 
   useEffect(() => {
     if (showWorkoutForm) workoutTitleRef.current?.focus();
@@ -192,7 +238,12 @@ export default function FithubDashboard({ today, initialState = {} }) {
   const nextWorkout = useMemo(() => getNextWorkout(workouts, today), [today, workouts]);
 
   function toggleGoal(goalId) {
-    setCompleted((current) => current.includes(goalId) ? current.filter((id) => id !== goalId) : [...current, goalId]);
+    dirty.current = true;
+    setGoalHistory((history) => {
+      const current = history.find((day) => day.date === selectedDate)?.completed ?? [];
+      const completed = current.includes(goalId) ? current.filter((id) => id !== goalId) : [...current, goalId];
+      return [...history.filter((day) => day.date !== selectedDate), { date: selectedDate, completed }].sort((a, b) => a.date.localeCompare(b.date));
+    });
   }
 
   function toggleGymVisit() {
@@ -202,9 +253,13 @@ export default function FithubDashboard({ today, initialState = {} }) {
   function addGoal(event) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const goal = { id: crypto.randomUUID(), label: String(form.get('label') || '').trim(), detail: String(form.get('detail') || '').trim(), icon: 'check' };
-    if (!goal.label) return;
-    setGoals((current) => [...current, goal]);
+    const goal = { id: editingGoal?.id ?? crypto.randomUUID(), label: String(form.get('label') || '').trim(), detail: String(form.get('detail') || '').trim(), icon: 'check' };
+    if (!goal.label) { setGoalError('Enter a goal name, such as Drink 4 L of water.'); return; }
+    if (!editingGoal && goals.length >= 100) { setGoalError('You can keep up to 100 daily goals. Remove a goal before adding another.'); return; }
+    dirty.current = true;
+    setGoals((current) => editingGoal ? current.map((item) => item.id === goal.id ? goal : item) : [...current, goal]);
+    setEditingGoal(null);
+    setGoalError('');
     setShowGoalForm(false);
     event.currentTarget.reset();
   }
@@ -213,9 +268,9 @@ export default function FithubDashboard({ today, initialState = {} }) {
     const index = goals.findIndex((goal) => goal.id === goalId);
     const item = goals[index];
     if (!item) return;
-    setDeletedItem({ kind: 'goal', item, index, wasCompleted: completed.includes(goalId) });
+    setDeletedItem({ kind: 'goal', item, index, date: selectedDate });
     setGoals((current) => current.filter((goal) => goal.id !== goalId));
-    setCompleted((current) => current.filter((id) => id !== goalId));
+    dirty.current = true;
   }
 
   function addWorkout(event) {
@@ -252,7 +307,7 @@ export default function FithubDashboard({ today, initialState = {} }) {
         next.splice(Math.min(deletedItem.index, next.length), 0, deletedItem.item);
         return next;
       });
-      if (deletedItem.wasCompleted) setCompleted((current) => [...new Set([...current, deletedItem.item.id])]);
+
     } else {
       setWorkouts((current) => {
         if (current.some((workout) => workout.id === deletedItem.item.id)) return current;
@@ -291,11 +346,11 @@ export default function FithubDashboard({ today, initialState = {} }) {
           </button>
         </section>
 
-        <section className={styles.activityCard} aria-labelledby="activity-title">
+        <section className={styles.activityCard} id="activity" aria-labelledby="activity-title">
           <div className={styles.sectionHeading}>
             <div>
               <span className={styles.kicker}>Consistency</span>
-              <h2 id="activity-title">Your year in motion</h2>
+              <h2 id="activity-title">Gym activity</h2>
             </div>
             <div className={styles.statRow}>
               <div><strong>{visitCount}</strong><span>gym days</span></div>
@@ -312,18 +367,20 @@ export default function FithubDashboard({ today, initialState = {} }) {
         </section>
 
         <div className={styles.contentGrid}>
-          <section className={styles.goalsCard} aria-labelledby="goals-title">
+          <section className={styles.goalsCard} id="daily-goals" aria-labelledby="goals-title">
             <div className={styles.sectionHeading}>
               <div>
-                <span className={styles.kicker}>Today</span>
+                <span className={styles.kicker}>{selectedDate === today ? 'Today' : selectedDate}</span>
                 <h2 id="goals-title">Daily goals</h2>
               </div>
-              <button className={styles.smallAddButton} type="button" onClick={() => setShowGoalForm((current) => !current)} aria-expanded={showGoalForm} aria-controls="goal-form"><Icon name={showGoalForm ? 'close' : 'plus'} size={15} /> {showGoalForm ? 'Cancel' : 'Add goal'}</button>
+              <button className={styles.smallAddButton} type="button" onClick={() => { setEditingGoal(null); setGoalError(''); setShowGoalForm((current) => !current); }} aria-expanded={showGoalForm} aria-controls="goal-form"><Icon name={showGoalForm ? 'close' : 'plus'} size={15} /> {showGoalForm ? 'Cancel' : 'Add goal'}</button>
             </div>
-            <div className={styles.progressTrack} role="progressbar" aria-label="Today's goal progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow={completion}>
+            <label className={styles.dateField}>Goal date<input type="date" value={selectedDate} max={today} required onChange={(event) => { const date = event.target.value; if (date && date <= today) setSelectedDate(date); }} /></label>
+            {goalError && <p className={styles.syncError} role="alert">{goalError}</p>}
+            <div className={styles.progressTrack} role="progressbar" aria-label={`Goal progress for ${selectedDate}`} aria-valuemin="0" aria-valuemax="100" aria-valuenow={completion}>
               <span style={{ width: `${completion}%` }} />
             </div>
-            {showGoalForm && <form className={styles.goalForm} id="goal-form" onSubmit={addGoal}><label>Goal<input ref={goalInputRef} name="label" maxLength="80" placeholder="e.g. Stretch for 10 minutes" required /></label><label>Note (optional)<input name="detail" maxLength="120" placeholder="Add a useful cue" /></label><button type="submit">Save goal</button></form>}
+            {showGoalForm && <form className={styles.goalForm} id="goal-form" key={editingGoal?.id ?? 'new'} onSubmit={addGoal}><label>Goal<input ref={goalInputRef} defaultValue={editingGoal?.label ?? ''} name="label" maxLength="80" placeholder="e.g. Stretch for 10 minutes" required /></label><label>Note (optional)<input name="detail" defaultValue={editingGoal?.detail ?? ''} maxLength="120" placeholder="Add a useful cue" /></label><button type="submit" disabled={syncState === 'saving'}>{syncState === 'saving' ? 'Saving...' : editingGoal ? 'Save changes' : 'Save goal'}</button></form>}
             <div className={styles.goalList}>
               {goals.map((goal) => {
                 const isDone = completed.includes(goal.id);
@@ -334,6 +391,7 @@ export default function FithubDashboard({ today, initialState = {} }) {
                       <span className={styles.goalCopy}><strong>{goal.label}</strong>{goal.detail && <small>{goal.detail}</small>}</span>
                       <span className={styles.checkbox}>{isDone && <Icon name="check" size={15} />}</span>
                     </button>
+                    <button className={styles.goalEdit} type="button" onClick={() => { setEditingGoal(goal); setShowGoalForm(true); setGoalError(''); goalInputRef.current?.focus(); }} aria-label={`Edit ${goal.label}`}>Edit</button>
                     <button className={styles.goalDelete} type="button" onClick={() => deleteGoal(goal.id)} aria-label={`Delete ${goal.label}`}><Icon name="trash" size={16} /></button>
                   </div>
                 );
@@ -342,7 +400,7 @@ export default function FithubDashboard({ today, initialState = {} }) {
             </div>
             <div className={styles.goalFooter}>
               <span>{completedGoalCount}/{goals.length} complete</span>
-              <span>{goals.length > 0 && completion === 100 ? 'All done for today.' : 'Build a routine that works for you.'}</span>
+              <span>{goals.length > 0 && completion === 100 ? `All done for ${selectedDate === today ? 'today' : selectedDate}.` : 'Build a routine that works for you.'}</span>
             </div>
           </section>
 
@@ -357,6 +415,12 @@ export default function FithubDashboard({ today, initialState = {} }) {
             </button>
           </aside>
         </div>
+
+        <section className={styles.activityCard} id="habits" aria-labelledby="habits-title">
+          <div className={styles.sectionHeading}><div><span className={styles.kicker}>Daily habits</span><h2 id="habits-title">Your habits over time</h2><p>Choose a square to review that day. Numbers show completed goals, including goals later removed. Use arrow keys to move between days.</p></div></div>
+          <HabitGrid today={today} history={goalHistory} selectedDate={selectedDate} onSelect={(date) => { setSelectedDate(date); document.getElementById('daily-goals')?.scrollIntoView(); }} />
+          {!goalHistory.some((day) => day.completed.length) && <p className={styles.habitEmpty}>Complete your first daily goal to start your habit history.</p>}
+        </section>
 
         <section className={styles.planSection} id="workout-plan" aria-labelledby="plan-title">
           <div className={styles.sectionHeading}>
